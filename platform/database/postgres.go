@@ -32,7 +32,7 @@ func PostgreSQLConnection(DBTableName string) (err error) {
 	DB_URL_WRITE := DB_SEVER_HOST_WRITE + DB_SEVER_HOST_USER_WRITE + DB_SEVER_HOST_PASSWORD_WRITE + DB_SEVER_HOST_DBNAME_WRITE + DB_SEVER_HOST_PORT_WRITE + " sslmode=disable TimeZone=Asia/bangkok"
 	dsn_write := DB_URL_WRITE
 
-	DBConn, err = gorm.Open(postgres.Open(dsn_write), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: false}})
+	DBConn, err = gorm.Open(postgres.Open(dsn_write), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		logger.SugarLogger.Errorf(err.Error())
 		return

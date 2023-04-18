@@ -10,4 +10,7 @@ import (
 func PrivateRoutes(a *fiber.App) {
 	route := a.Group("/api/v2")
 	route.Post("/createjob", controllersCreatejob.CreateJob)
+	route.Post("/updatejob", controllersCreatejob.UpdateJob)
+	route.Post("/deletejob", controllersCreatejob.DeleteJob)
+
 }
