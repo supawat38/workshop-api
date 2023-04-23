@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"app/pkg/utils"
-	"app/platform/database"
 	"app/platform/storage"
 	"bytes"
 	"crypto/aes"
@@ -31,7 +29,6 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/juunini/simple-go-line-notify/notify"
-	"gorm.io/datatypes"
 )
 
 func ReadUserIP(c *fiber.Ctx) string {
@@ -42,15 +39,6 @@ func ReadUserIP(c *fiber.Ctx) string {
 		IPAddress = GetLocalIP()
 	}
 	return IPAddress
-}
-
-// Default Controller
-func DefaultControllerHomepage(c *fiber.Ctx) error {
-	// Return สถานะสำเร็จ
-	return c.JSON(fiber.Map{
-		"code": 200,
-		"msg":  utils.ResponseMessage()["api"]["success"],
-	})
 }
 
 // อัพโหลดรูปภาพ
@@ -238,62 +226,6 @@ func DecryptGenV2(encryptedString string) (decryptedString string) {
 	return string(cipherTextDecoded)
 }
 
-// หาว่า position ที่อยู่ภายใต้เราคือ
-func GetChildPosition(CurrentPosition string) (ChildPosition string) {
-
-	//position ปัจจุบัน
-	switch CurrentPosition {
-	case "superadmin":
-		ChildPosition = "company"
-		break
-	case "company":
-		ChildPosition = "shareholder"
-		break
-	case "shareholder":
-		ChildPosition = "agent"
-		break
-	case "agent":
-		ChildPosition = "agent"
-		break
-	}
-
-	return ChildPosition
-}
-
-// สร้าง mapping chain
-func GenerateChain(CnfParent string, User_ID uint, Posision string) (chaintoken string) {
-
-	var TextCnfByte = ""
-	var arr []interface{}
-	_ = json.Unmarshal([]byte(CnfParent), &arr)
-	if len(arr) > 0 {
-
-		//จำนวนของเก่า
-		for i := 0; i < len(arr); i++ {
-			jsonValue := arr[i]
-			byteValue, _ := json.Marshal(jsonValue)
-			Result_value_map := map[string]interface{}{}
-			json.Unmarshal(byteValue, &Result_value_map)
-
-			var IDOld = strconv.FormatFloat(Result_value_map["id"].(float64), 'f', 0, 64)
-			TextCnfByte += `{"id": ` + IDOld + `, "position": "` + Result_value_map["position"].(string) + `"},`
-		}
-
-		//เพิ่มของตัวมันเอง
-		var IDNew string = strconv.FormatUint(uint64(User_ID), 10)
-		TextCnfByte += `{"id": ` + IDNew + `, "position": "` + Posision + `"}`
-	} else {
-		//เพิ่มของตัวมันเอง
-		var IDNew string = strconv.FormatUint(uint64(User_ID), 10)
-		TextCnfByte += `{"id": ` + IDNew + `, "position": "` + Posision + `"}`
-	}
-
-	str := `{
-		"parent": [` + TextCnfByte + `]
-	}`
-	return str
-}
-
 // Get Local IP
 func GetLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
@@ -342,6 +274,7 @@ func JsonToMap(b []byte) (m map[string]interface{}) {
 	json.Unmarshal(b, &m)
 	return
 }
+
 func JsonToArray(b []byte) (i []interface{}) {
 	json.Unmarshal(b, &i)
 	return
@@ -371,6 +304,7 @@ func InterfaceToMap(b interface{}) (m map[string]interface{}) {
 
 	return
 }
+
 func GetDayofWeek(day string) (dayofweek int) {
 	switch day {
 	case "sunday":
@@ -439,34 +373,6 @@ func CheckArrayString(a []string, i interface{}) (found bool) {
 	return
 }
 
-// ตรวจสอบว่า user นี้เคยล็อกอินเเล้วหรือยัง (สำหรับหลังบ้าน)
-func GetTokenInTable(token string, IPLocal string) (status string) {
-
-	//หาข้อมูลที่เคย login
-	query := ` SELECT A.* FROM ( SELECT id FROM user_agents `
-	query += ` WHERE `
-	query += ` token = @token `
-	//AND last_ip_login = @IPLocal
-	query += ` UNION `
-	query += ` SELECT id FROM sub_accounts `
-	query += ` WHERE `
-	query += ` token = @token ) AS A LIMIT 1 `
-
-	database.DBConn.Raw(query, map[string]interface{}{"token": token, "IPLocal": IPLocal}).Scan(&status)
-	return
-}
-
-// ตรวจสอบว่า user นี้เคยล็อกอินเเล้วหรือยัง (สำหรับหน้าบ้าน)
-func GetTokenInTableMember(token string, IPLocal string) (status string) {
-
-	//หาข้อมูลที่เคย login
-	query := ` SELECT id FROM user_members `
-	query += ` WHERE `
-	query += ` token = @token AND last_ip_login = @IPLocal `
-	database.DBConn.Raw(query, map[string]interface{}{"token": token, "IPLocal": IPLocal}).Scan(&status)
-	return
-}
-
 // ปัดทศนิยม
 func FloatPrecision(num float64, precision int) float64 {
 	p := math.Pow10(precision)
@@ -527,45 +433,6 @@ func DateDiff(a, b time.Time) (year, month, day, hour, min, sec int) {
 	return
 }
 
-// เก็บข้อมูล login
-func CreateLogLogin(c *fiber.Ctx, typelogin string, Username string) {
-
-	//วันที่ปัจจุบัน
-	dTimeNow := time.Now().Local()
-	dTimeString := dTimeNow.Format("2006-01-02 15:04:05")
-
-	//Local IP
-	LocalIP := ReadUserIP(c)
-	Platform := c.Get("User-Agent")
-
-	var TableLogInsert string
-	if typelogin == "useragent" {
-		TableLogInsert = "log_login_user_agents"
-	} else if typelogin == "subaccount" {
-		TableLogInsert = "log_login_sub_accounts"
-	} else if typelogin == "member" {
-		TableLogInsert = "log_login_user_members"
-	}
-
-	sqlStatement := ` INSERT INTO ` + TableLogInsert + `
-						( Ip_login , Username , Platform , created_at ) `
-	sqlStatement += ` 	VALUES (
-							@ip_login ,
-							@username ,
-							@platform ,
-							@created_at
-						) `
-	if database.DBConn.Exec(sqlStatement,
-		map[string]interface{}{
-			"ip_login":   LocalIP,
-			"username":   Username,
-			"platform":   Platform,
-			"created_at": dTimeString,
-		}).Error != nil {
-		return
-	}
-}
-
 // รับค่าได้ตัวเลขที่เป็น str
 func Is_StrNumber(word string) bool {
 	return regexp.MustCompile(`^[0-9]*$`).MatchString(word)
@@ -578,25 +445,6 @@ func Explode(delimiter, text string) []string {
 	} else {
 		return strings.Split(text, delimiter)
 	}
-}
-
-// แปลง cnf เป็น Agent[] array
-func GetCnfToArray(cnf datatypes.JSON) (AgentID []uint) {
-
-	tCnfResultFormat := map[string][]interface{}{}
-	json.Unmarshal([]byte(cnf), &tCnfResultFormat)
-
-	// Loop Agent from cnf
-	for _, v := range tCnfResultFormat["parent"] {
-
-		tmp_agent_id := v.(map[string]interface{})["id"].(float64)
-		tmp_agent_id_int := uint(tmp_agent_id)
-
-		AgentID = append(AgentID, tmp_agent_id_int)
-
-	}
-
-	return
 }
 
 // ## Open sort

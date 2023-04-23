@@ -1,10 +1,7 @@
 package middleware
 
 import (
-	"app/pkg/utils"
 	"os"
-
-	funcCommon "app/app/controllers/common"
 
 	"github.com/gofiber/fiber/v2"
 	jwtMiddleware "github.com/gofiber/jwt/v2"
@@ -38,49 +35,5 @@ func jwtError(c *fiber.Ctx, err error) error {
 		"code":  4001,
 		"error": true,
 		"msg":   err.Error(),
-	})
-}
-
-//ตรวจสอบว่า Token นั้น เคยมีในระบบแล้วจริงๆ
-func CheckAccessToken(c *fiber.Ctx) error {
-	//ข้อมูล Token
-	TokenForUser, _ := funcCommon.GetTokenFromSession(c)
-
-	//Local IP
-	LocalIP := funcCommon.ReadUserIP(c)
-
-	//ตรวจสอบว่ามีการ login ในตาราง user_agent or sub_account จริงๆไหม (check token , ip address)
-	StatusCheckToken := funcCommon.GetTokenInTable(TokenForUser, LocalIP)
-
-	if StatusCheckToken != "" {
-		return c.Next()
-	}
-
-	return c.JSON(fiber.Map{
-		"code":     utils.ResponseCode()["api"]["token_auth_fail"],
-		"msg":      utils.ResponseMessage()["api"]["token_auth_fail"],
-		"platform": "Token ต้องเป็นการเข้าสู่ระบบ จากหลังบ้านเท่านั้น (agent & shareholder & company & subaccount)",
-	})
-}
-
-//ตรวจสอบว่า Token นั้น เคยมีในระบบแล้วจริงๆ (และเป็น member ไหม)
-func CheckAccessTokenMember(c *fiber.Ctx) error {
-	//ข้อมูล Token
-	TokenForUser, _ := funcCommon.GetTokenFromSession(c)
-
-	//Local IP
-	LocalIP := funcCommon.ReadUserIP(c)
-
-	//ตรวจสอบว่ามีการ login ในตาราง user_members จริงๆไหม (check token , ip address)
-	StatusCheckToken := funcCommon.GetTokenInTableMember(TokenForUser, LocalIP)
-
-	if StatusCheckToken != "" {
-		return c.Next()
-	}
-
-	return c.JSON(fiber.Map{
-		"code":     utils.ResponseCode()["api"]["token_auth_fail"],
-		"msg":      utils.ResponseMessage()["api"]["token_auth_fail"],
-		"platform": "Token ต้องเป็นการเข้าสู่ระบบเป็น จากหน้าบ้านเท่านั้น (member)",
 	})
 }
